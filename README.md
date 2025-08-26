@@ -4,7 +4,7 @@ This repository contains all the assignments for the **ES335 Machine Learning** 
 
 ## Structure
 - Each assignment is stored in its own folder.
-- The folder name follows the format: `Assignment_X` (where X is the assignment number).
+- The folder name follows the format: `Assignment X` (where X is the assignment number).
 - Each folder contains the problem statement, solutions, and relevant code/notebooks.
 
 ## Usage
