@@ -14,4 +14,4 @@ This repository contains all the assignments for the **ES335 Machine Learning** 
 
 ## Requirements
 - Python 3.x
-- NumPy, Pandas, Matplotlib, Scikit-learn, PyTorch (as required per assignment)
+- NumPy, Pandas, Matplotlib, Scikit-learn, PyTorch (as required per assignment).
