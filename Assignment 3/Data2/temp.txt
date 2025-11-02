@@ -1,0 +1,58 @@
+\documentclass{article}
+
+% --- Packages ---
+\usepackage{amsmath, amsthm, amssymb} % Math and theorem support
+
+% --- Theorem Environments ---
+\newtheorem{proposition}{Proposition}
+
+% --- Custom Macros for Common Math Notation ---
+\newcommand{\QCoh}{\mathrm{QCoh}}     % Category of quasi-coherent sheaves
+\newcommand{\Spec}{\mathrm{Spec}}     % Spectrum of a ring
+\newcommand{\Hom}{\mathrm{Hom}}       % Hom functor
+\newcommand{\Sh}{\mathrm{Sh}}         % Sheaves
+\newcommand{\Mod}{\mathrm{Mod}}       % Modules
+\newcommand{\OO}{\mathcal{O}}         % Structure sheaf
+
+% --- Document Info ---
+\title{My LaTeX Test Document}
+\author{Your Name}
+\date{\today}
+
+% --- Document Body ---
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:intro}
+
+Hello, world! This is my first document compiled with VS Code and the \textbf{LaTeX Workshop} extension.
+
+If this works, you should see:
+\begin{itemize}
+    \item This bullet point.
+    \item And this one.
+\end{itemize}
+
+\begin{enumerate}
+    \item If $k$ is a field, then something interesting happens.
+\end{enumerate}
+
+\begin{proposition}
+    \label{proposition-universal-homeomorphism}
+    Let $S$ be a scheme. Let $X$ be a decent algebraic space over $S$. 
+    Let $Z \subset X$ be a closed subspace. 
+    Let $\mathcal{F}$ be a quasi-coherent sheaf on $X$.
+\end{proposition}
+
+Let $X$ be a scheme over a field $k$. The structure sheaf $\mathcal{O}_X$ defines a natural topology on $X$, and for any open subset $U \subseteq X$, the sections of $\mathcal{O}_X$ over $U$ form a ring. The morphism of schemes $f : Y \to X$ induces a pullback on sheaves, written as $f^*$. The category of quasi-coherent sheaves on $X$ is denoted by $\QCoh(X)$ and plays a fundamental role in algebraic geometry because
+
+
+\begin{proposition}
+Let $X$ be a scheme over a field $k$. The structure sheaf $\mathcal{O}_X$ defines a natural topology on $X$, and for any open subset $U \subseteq X$, the sections of $\mathcal{O}_X$ over $U$ form a ring. The morphism of schemes $f : Y \to X$ induces a pullback on sheaves, written as $f^*$. The category of quasi-coherent sheaves on $X$ is denoted by $\QCoh(X)$ and plays a fundamental role in algebraic geometry because
+the induced complex$K^\bullet$,resp.\ $K^n$is$m$-pseudo-coherent.
+Thus we may assume$M$is a flat$R$-module.
+\end{proposition}
+
+\end{document}
