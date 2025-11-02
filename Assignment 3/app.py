@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import torch
 import torch.nn as nn
@@ -9,8 +8,8 @@ import os
 import glob
 from collections import Counter
 from utils import MLPTextGenerator
+from huggingface_hub import hf_hub_download # Already imported, perfect!
 
-# --- Caching Functions (Used by both) ---
 @st.cache_resource
 def load_vocabulary(vocab_path):
     """Loads the word_to_ix and ix_to_word mappings."""
@@ -63,11 +62,11 @@ def append_word_natural(s, nxt):
 # --- STRUCTURED LANGUAGE Helpers ---
 
 TOKEN_REGEX = re.compile(r"""
-    (\\[a-zA-Z]+) |                  # LaTeX commands
+    (\\[a-zA-Z]+) |              # LaTeX commands
     (::|->|==|!=|<=|>=|&&|\|\||<<|>>|\+=|-=|\*=|/=|%=|&=|\^=|\|=) |  # Multi-char ops
-    ([a-zA-Z_][a-zA-Z0-9_]*) |          # Identifiers
-    (\d+\.\d*|\.\d+|\d+) |              # Numbers
-    (\S)                               # Other non-whitespace chars
+    ([a-zA-Z_][a-zA-Z0-9_]*) |      # Identifiers
+    (\d+\.\d*|\.\d+|\d+) |          # Numbers
+    (\S)                            # Other non-whitespace chars
 """, re.VERBOSE)
 
 def tokenize_code(line): 
@@ -128,7 +127,10 @@ def generate_next_word_structured(model, sentence, word_to_ix, ix_to_word, conte
 st.set_page_config(layout="wide")
 st.title("Neural Language Generator")
 
-# --- Sidebar Controls ---
+# --- MODIFICATION: Define your Hugging Face Repo ID ---
+HF_REPO_ID = "BhavayGoyal/Machine_Learning_Assignment_3"
+
+# --- Sidebar Controls (Unchanged) ---
 st.sidebar.title("Configuration")
 
 # 1. Language Type Selector
@@ -139,13 +141,13 @@ lang_type = st.sidebar.radio(
 
 # 2. Set variables based on language type
 if lang_type == "Natural Language":
-    model_dir = "Models"
+    model_dir = "Models" # This is now a path *inside* the HF repo
     vocab_file = "vocab.json"
     k_label = "Number of words to predict"
     default_text = "The company is doing"
     info_text = "💡 **How this works:** Words not in the model's vocabulary will be ignored when building the context for prediction."
 else:
-    model_dir = "Models_Structured"
+    model_dir = "Models_Structured" # This is now a path *inside* the HF repo
     vocab_file = "vocab.json"
     k_label = "Number of tokens to predict"
     default_text = r"\begin{proof} Let"
@@ -153,7 +155,6 @@ else:
 
 # 3. Model Parameter Selection
 st.sidebar.subheader("Model Parameters")
-# Set defaults to match one of the models, e.g., the "Medium" one (CS10, ED64, HL2, Relu)
 cs = st.sidebar.selectbox("Context Size", [5, 10, 15], index=1)
 ed = st.sidebar.selectbox("Embedding Dimension", [32, 64], index=1)
 hl = st.sidebar.selectbox("Number of Hidden Layers", [1, 2, 3], index=1)
@@ -180,88 +181,102 @@ seed = st.sidebar.number_input(
     help="Set a specific seed for reproducible results."
 )
 
-# --- Construct model name and load ---
+# --- Construct model name (Unchanged) ---
 act_name = "Relu" if act == "relu" else "Tanh"
 selected_model_name = f"CS{cs}_ED{ed}_HL{hl}_{act_name}.pth"
-selected_model_path = os.path.join(model_dir, selected_model_name)
+
+# --- MODIFICATION: Define paths *within the HF repo* ---
+# These paths are relative to the root of your HF repo
+# ALWAYS use forward slashes for repo paths, as they are part of a URL
+repo_vocab_path = f"{model_dir}/{vocab_file}"
+repo_model_path = f"{model_dir}/{selected_model_name}"
 
 # --- Load Model & Vocab ---
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 try:
-    # 1. Load vocabulary
-    vocab_path = os.path.join(model_dir, vocab_file)
-    if not os.path.exists(vocab_path):
-        st.error(f"Could not find '{vocab_file}' in '{model_dir}'. Please run the corresponding training script first.")
-    else:
-        word_to_ix, ix_to_word = load_vocabulary(vocab_path)
+    # 1. Download and Load vocabulary
+    with st.spinner(f"Downloading vocab: {repo_vocab_path}..."):
+        # hf_hub_download will download the file and return its *local cached path*
+        local_vocab_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=repo_vocab_path
+        )
+    # Load from the local cached path
+    word_to_ix, ix_to_word = load_vocabulary(local_vocab_path)
     
-        # 2. Check if selected model exists
-        if os.path.exists(selected_model_path):
-            # Load the model
-            model, CONTEXT_SIZE = load_model(selected_model_path, device)
-            
-            # Display model info in sidebar
-            st.sidebar.success(f"Loaded '{selected_model_name}'")
-            st.sidebar.info(f"**Actual Model Context:** {CONTEXT_SIZE} tokens/words")
-            st.sidebar.caption(f"**Device:** {device.type.upper()}")
+    # 2. Download and Load model
+    with st.spinner(f"Downloading model: {repo_model_path}..."):
+        local_model_path = hf_hub_download(
+            repo_id=HF_REPO_ID,
+            filename=repo_model_path
+        )
+    # Load from the local cached path
+    model, CONTEXT_SIZE = load_model(local_model_path, device)
+    
+    # --- If successful, show the rest of the app ---
+    # (This logic was previously inside the `if/else` blocks)
+    
+    st.sidebar.success(f"Loaded '{selected_model_name}'")
+    st.sidebar.info(f"**Actual Model Context:** {CONTEXT_SIZE} tokens/words")
+    st.sidebar.caption(f"**Device:** {device.type.upper()}")
 
-            # --- Main App Area ---
-            st.info(info_text)
-            
-            input_text = st.text_area("Enter your starting text:", default_text, height=150)
+    # --- Main App Area ---
+    st.info(info_text)
+    
+    input_text = st.text_area("Enter your starting text:", default_text, height=150)
 
-            if st.button("Generate", type="primary"):
-                if not input_text.strip():
-                    st.warning("Please enter some starting text.")
-                else:
-                    # Set seeds for reproducibility
-                    torch.manual_seed(seed)
-                    np.random.seed(seed)
-                    
-                    with st.spinner(f"Generating {k_words} items..."):
-                        progress_bar = st.progress(0.0, text="Starting generation...")
-
-                        if lang_type == "Natural Language":
-                            # --- Natural Language Generation Loop ---
-                            generated_text = input_text
-                            for i in range(k_words):
-                                progress_bar.progress((i + 1) / k_words, text=f"Generating word {i+1}/{k_words}")
-                                next_word = generate_next_word_natural(
-                                    model, generated_text, word_to_ix, ix_to_word,
-                                    CONTEXT_SIZE, device, temperature
-                                )
-                                generated_text = append_word_natural(generated_text, next_word)
-                            
-                            progress_bar.empty()
-                            st.subheader("Generated Text")
-                            st.markdown(f"_{generated_text}_")
-                        
-                        else:
-                            # --- Structured Language Generation Loop ---
-                            s = input_text
-                            tokens = tokenize_code(s)
-                            token_counts = Counter(tokens)
-                            in_math = False # Basic check
-                            if (token_counts['$'] % 2 != 0) or (token_counts['$$'] % 2 != 0): in_math = True
-                            elif token_counts['\\['] != token_counts['\\]']: in_math = True
-                            elif token_counts['\\('] != token_counts['\\)']: in_math = True
-
-                            for i in range(k_words):
-                                progress_bar.progress((i + 1) / k_words, text=f"Generating token {i+1}/{k_words}")
-                                next_token = generate_next_word_structured(
-                                    model, s, word_to_ix, ix_to_word,
-                                    CONTEXT_SIZE, device, temperature
-                                )
-                                s, tokens, in_math = append_token_structured(s, tokens, next_token, in_math)
-                            
-                            progress_bar.empty()
-                            st.subheader("Generated Text")
-                            st.code(s, language="latex")
+    if st.button("Generate", type="primary"):
+        if not input_text.strip():
+            st.warning("Please enter some starting text.")
         else:
-            # File not found, show an error in the main panel
-            st.error(f"**Model Not Found:** The model file '{selected_model_name}' was not found in the '{model_dir}' directory.")
-            st.warning("Please make sure you have trained this specific combination of parameters using the training script, or select a different combination.")
+            # Set seeds for reproducibility
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            
+            with st.spinner(f"Generating {k_words} items..."):
+                progress_bar = st.progress(0.0, text="Starting generation...")
+
+                if lang_type == "Natural Language":
+                    # --- Natural Language Generation Loop ---
+                    generated_text = input_text
+                    for i in range(k_words):
+                        progress_bar.progress((i + 1) / k_words, text=f"Generating word {i+1}/{k_words}")
+                        next_word = generate_next_word_natural(
+                            model, generated_text, word_to_ix, ix_to_word,
+                            CONTEXT_SIZE, device, temperature
+                        )
+                        generated_text = append_word_natural(generated_text, next_word)
+                    
+                    progress_bar.empty()
+                    st.subheader("Generated Text")
+                    st.markdown(f"_{generated_text}_")
+                
+                else:
+                    # --- Structured Language Generation Loop ---
+                    s = input_text
+                    tokens = tokenize_code(s)
+                    token_counts = Counter(tokens)
+                    in_math = False # Basic check
+                    if (token_counts['$'] % 2 != 0) or (token_counts['$$'] % 2 != 0): in_math = True
+                    elif token_counts['\\['] != token_counts['\\]']: in_math = True
+                    elif token_counts['\\('] != token_counts['\\)']: in_math = True
+
+                    for i in range(k_words):
+                        progress_bar.progress((i + 1) / k_words, text=f"Generating token {i+1}/{k_words}")
+                        next_token = generate_next_word_structured(
+                            model, s, word_to_ix, ix_to_word,
+                            CONTEXT_SIZE, device, temperature
+                        )
+                        s, tokens, in_math = append_token_structured(s, tokens, next_token, in_math)
+                    
+                    progress_bar.empty()
+                    st.subheader("Generated Text")
+                    st.code(s, language="latex")
 
 except Exception as e:
-    st.error(f"An error occurred: {e}")
+    # This will catch errors if the file doesn't exist on HF Hub
+    # or if the model fails to load.
+    st.error(f"Error loading model '{repo_model_path}' from {HF_REPO_ID}.")
+    st.error(f"Details: {e}")
+    st.warning("Please ensure the selected model parameters exist on the Hugging Face Hub repository.")
